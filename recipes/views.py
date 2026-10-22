@@ -2,11 +2,14 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, Product
+from .models import Category, Product, Recipe
 from .serializers import (
     CategoryDetailSerializer,
     CategorySerializer,
     ProductSerializer,
+    RecipeDetailSerializer,
+    RecipeInputSerializer,
+    RecipeShortSerializer,
 )
 
 
@@ -128,3 +131,31 @@ class ProductDetailView(APIView):
             )
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class RecipeListView(APIView):
+    def get(self, request):
+        recipes = Recipe.objects.select_related("category").order_by("id")
+        return Response(RecipeShortSerializer(recipes, many=True).data)
+
+    def post(self, request):
+        serializer = RecipeInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return invalid_data(serializer)
+        recipe = serializer.save()
+        return Response(
+            RecipeDetailSerializer(recipe).data, status=status.HTTP_201_CREATED
+        )
+
+
+class RecipeDetailView(APIView):
+    def get_recipe(self, pk):
+        try:
+            return Recipe.objects.get(pk=pk)
+        except Recipe.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        recipe = self.get_recipe(pk)
+        if recipe is None:
+            return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
+        return Response(RecipeDetailSerializer(recipe).data)
