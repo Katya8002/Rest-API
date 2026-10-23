@@ -126,6 +126,18 @@ class RecipeInputSerializer(serializers.Serializer):
         self._save_steps_and_ingredients(recipe, steps, ingredients)
         return recipe
 
+    @transaction.atomic
+    def update(self, recipe, validated_data):
+        steps = validated_data.pop("steps")
+        ingredients = validated_data.pop("ingredients")
+        for field, value in validated_data.items():
+            setattr(recipe, field, value)
+        recipe.save()
+        recipe.steps.all().delete()
+        recipe.ingredients.all().delete()
+        self._save_steps_and_ingredients(recipe, steps, ingredients)
+        return recipe
+
 
 class RecipeFilterSerializer(serializers.Serializer):
     search = serializers.CharField(required=False)

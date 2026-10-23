@@ -173,3 +173,20 @@ class RecipeDetailView(APIView):
         if recipe is None:
             return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
         return Response(RecipeDetailSerializer(recipe).data)
+
+    def put(self, request, pk):
+        recipe = self.get_recipe(pk)
+        if recipe is None:
+            return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
+        serializer = RecipeInputSerializer(recipe, data=request.data)
+        if not serializer.is_valid():
+            return invalid_data(serializer)
+        recipe = serializer.save()
+        return Response(RecipeDetailSerializer(recipe).data)
+
+    def delete(self, request, pk):
+        recipe = self.get_recipe(pk)
+        if recipe is None:
+            return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
+        recipe.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
