@@ -125,3 +125,10 @@ class RecipeInputSerializer(serializers.Serializer):
         recipe = Recipe.objects.create(**validated_data)
         self._save_steps_and_ingredients(recipe, steps, ingredients)
         return recipe
+
+
+class RecipeFilterSerializer(serializers.Serializer):
+    search = serializers.CharField(required=False)
+    category_id = serializers.IntegerField(required=False)
+    max_time = serializers.IntegerField(required=False, min_value=1)
+    product_id = serializers.IntegerField(required=False)

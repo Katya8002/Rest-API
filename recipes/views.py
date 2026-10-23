@@ -8,6 +8,7 @@ from .serializers import (
     CategorySerializer,
     ProductSerializer,
     RecipeDetailSerializer,
+    RecipeFilterSerializer,
     RecipeInputSerializer,
     RecipeShortSerializer,
 )
@@ -134,7 +135,20 @@ class ProductDetailView(APIView):
 
 class RecipeListView(APIView):
     def get(self, request):
+        filters = RecipeFilterSerializer(data=request.query_params)
+        if not filters.is_valid():
+            return invalid_data(filters)
+        params = filters.validated_data
+
         recipes = Recipe.objects.select_related("category").order_by("id")
+        if "category_id" in params:
+            recipes = recipes.filter(category_id=params["category_id"])
+        if "max_time" in params:
+            recipes = recipes.filter(cooking_time_min__lte=params["max_time"])
+        if "product_id" in params:
+            recipes = recipes.filter(ingredients__product_id=params["product_id"])
+        if "search" in params:
+            recipes = filter_by_name(recipes, params["search"])
         return Response(RecipeShortSerializer(recipes, many=True).data)
 
     def post(self, request):
