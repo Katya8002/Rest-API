@@ -26,9 +26,11 @@ def invalid_data(serializer):
         "Некоректні дані.", status.HTTP_400_BAD_REQUEST, serializer.errors
     )
 
+
 def filter_by_name(items, search):
     search = search.casefold()
     return [item for item in items if search in item.name.casefold()]
+
 
 class CategoryListView(APIView):
     def get(self, request):
@@ -80,6 +82,8 @@ class CategoryDetailView(APIView):
             )
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ProductListView(APIView):
     def get(self, request):
         products = Product.objects.order_by("id")
@@ -132,6 +136,7 @@ class ProductDetailView(APIView):
             )
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class RecipeListView(APIView):
     def get(self, request):

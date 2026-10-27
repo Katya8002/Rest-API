@@ -22,7 +22,6 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class CategoryDetailSerializer(serializers.ModelSerializer):
-
     recipes = serializers.SerializerMethodField()
 
     class Meta:
@@ -35,6 +34,7 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
             {"id": r.id, "name": r.name, "cooking_time_min": r.cooking_time_min}
             for r in recipes
         ]
+
 
 class ProductSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
@@ -50,6 +50,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ["id", "name", "unit"]
+
 
 class RecipeShortSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
