@@ -1,8 +1,10 @@
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Category, Product, Recipe
+from .permissions import IsAdminOrReadOnly
 from .serializers import (
     CategoryDetailSerializer,
     CategorySerializer,
@@ -33,6 +35,8 @@ def filter_by_name(items, search):
 
 
 class CategoryListView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request):
         categories = Category.objects.order_by("id")
         return Response(CategorySerializer(categories, many=True).data)
@@ -46,6 +50,8 @@ class CategoryListView(APIView):
 
 
 class CategoryDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get_category(self, pk):
         try:
             return Category.objects.get(pk=pk)
@@ -85,6 +91,8 @@ class CategoryDetailView(APIView):
 
 
 class ProductListView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request):
         products = Product.objects.order_by("id")
         search = request.query_params.get("search")
@@ -101,6 +109,8 @@ class ProductListView(APIView):
 
 
 class ProductDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get_product(self, pk):
         try:
             return Product.objects.get(pk=pk)
@@ -139,6 +149,8 @@ class ProductDetailView(APIView):
 
 
 class RecipeListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get(self, request):
         filters = RecipeFilterSerializer(data=request.query_params)
         if not filters.is_valid():
@@ -167,6 +179,8 @@ class RecipeListView(APIView):
 
 
 class RecipeDetailView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def get_recipe(self, pk):
         try:
             return Recipe.objects.get(pk=pk)
