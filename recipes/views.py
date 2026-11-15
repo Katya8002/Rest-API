@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -13,6 +14,26 @@ from .serializers import (
     RecipeFilterSerializer,
     RecipeInputSerializer,
     RecipeShortSerializer,
+)
+
+BAD_REQUEST = OpenApiResponse(description="Некоректні дані")
+UNAUTHORIZED = OpenApiResponse(description="Немає токена або він недійсний")
+FORBIDDEN = OpenApiResponse(description="Дія доступна лише адміністратору")
+NOT_FOUND = OpenApiResponse(description="Об'єкта з таким id немає")
+CONFLICT = OpenApiResponse(description="Видалити не можна: є пов'язані рецепти")
+DELETED = OpenApiResponse(description="Видалено, тіло відповіді порожнє")
+
+RECIPE_EXAMPLE = OpenApiExample(
+    "Яєчня",
+    value={
+        "name": "Яєчня",
+        "description": "",
+        "cooking_time_min": 5,
+        "category_id": 1,
+        "steps": ["Розігріти сковорідку", "Розбити яйця"],
+        "ingredients": [{"product_id": 1, "quantity": 2}],
+    },
+    request_only=True,
 )
 
 
@@ -37,10 +58,26 @@ def filter_by_name(items, search):
 class CategoryListView(APIView):
     permission_classes = [IsAdminOrReadOnly]
 
+    @extend_schema(
+        tags=["Категорії"],
+        summary="Список категорій",
+        responses=CategorySerializer(many=True),
+    )
     def get(self, request):
         categories = Category.objects.order_by("id")
         return Response(CategorySerializer(categories, many=True).data)
 
+    @extend_schema(
+        tags=["Категорії"],
+        summary="Створити категорію (лише адміністратор)",
+        request=CategorySerializer,
+        responses={
+            201: CategorySerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+        },
+    )
     def post(self, request):
         serializer = CategorySerializer(data=request.data)
         if not serializer.is_valid():
@@ -58,12 +95,29 @@ class CategoryDetailView(APIView):
         except Category.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Категорії"],
+        summary="Категорія з її рецептами",
+        responses={200: CategoryDetailSerializer, 404: NOT_FOUND},
+    )
     def get(self, request, pk):
         category = self.get_category(pk)
         if category is None:
             return error_response("Категорію не знайдено.", status.HTTP_404_NOT_FOUND)
         return Response(CategoryDetailSerializer(category).data)
 
+    @extend_schema(
+        tags=["Категорії"],
+        summary="Змінити категорію (лише адміністратор)",
+        request=CategorySerializer,
+        responses={
+            200: CategorySerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+            404: NOT_FOUND,
+        },
+    )
     def put(self, request, pk):
         category = self.get_category(pk)
         if category is None:
@@ -74,6 +128,17 @@ class CategoryDetailView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=["Категорії"],
+        summary="Видалити категорію (лише адміністратор)",
+        responses={
+            204: DELETED,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+            404: NOT_FOUND,
+            409: CONFLICT,
+        },
+    )
     def delete(self, request, pk):
         category = self.get_category(pk)
         if category is None:
@@ -93,6 +158,11 @@ class CategoryDetailView(APIView):
 class ProductListView(APIView):
     permission_classes = [IsAdminOrReadOnly]
 
+    @extend_schema(
+        tags=["Продукти"],
+        summary="Список продуктів з пошуком за назвою",
+        responses=ProductSerializer(many=True),
+    )
     def get(self, request):
         products = Product.objects.order_by("id")
         search = request.query_params.get("search")
@@ -100,6 +170,17 @@ class ProductListView(APIView):
             products = filter_by_name(products, search)
         return Response(ProductSerializer(products, many=True).data)
 
+    @extend_schema(
+        tags=["Продукти"],
+        summary="Створити продукт (лише адміністратор)",
+        request=ProductSerializer,
+        responses={
+            201: ProductSerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+        },
+    )
     def post(self, request):
         serializer = ProductSerializer(data=request.data)
         if not serializer.is_valid():
@@ -117,12 +198,29 @@ class ProductDetailView(APIView):
         except Product.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Продукти"],
+        summary="Продукт за id",
+        responses={200: ProductSerializer, 404: NOT_FOUND},
+    )
     def get(self, request, pk):
         product = self.get_product(pk)
         if product is None:
             return error_response("Продукт не знайдено.", status.HTTP_404_NOT_FOUND)
         return Response(ProductSerializer(product).data)
 
+    @extend_schema(
+        tags=["Продукти"],
+        summary="Змінити продукт (лише адміністратор)",
+        request=ProductSerializer,
+        responses={
+            200: ProductSerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+            404: NOT_FOUND,
+        },
+    )
     def put(self, request, pk):
         product = self.get_product(pk)
         if product is None:
@@ -133,6 +231,17 @@ class ProductDetailView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=["Продукти"],
+        summary="Видалити продукт (лише адміністратор)",
+        responses={
+            204: DELETED,
+            401: UNAUTHORIZED,
+            403: FORBIDDEN,
+            404: NOT_FOUND,
+            409: CONFLICT,
+        },
+    )
     def delete(self, request, pk):
         product = self.get_product(pk)
         if product is None:
@@ -151,6 +260,12 @@ class ProductDetailView(APIView):
 class RecipeListView(APIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+    @extend_schema(
+        tags=["Рецепти"],
+        summary="Список рецептів з пошуком і фільтрами",
+        parameters=[RecipeFilterSerializer],
+        responses={200: RecipeShortSerializer(many=True), 400: BAD_REQUEST},
+    )
     def get(self, request):
         filters = RecipeFilterSerializer(data=request.query_params)
         if not filters.is_valid():
@@ -168,6 +283,17 @@ class RecipeListView(APIView):
             recipes = filter_by_name(recipes, params["search"])
         return Response(RecipeShortSerializer(recipes, many=True).data)
 
+    @extend_schema(
+        tags=["Рецепти"],
+        summary="Створити рецепт",
+        request=RecipeInputSerializer,
+        examples=[RECIPE_EXAMPLE],
+        responses={
+            201: RecipeDetailSerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+        },
+    )
     def post(self, request):
         serializer = RecipeInputSerializer(data=request.data)
         if not serializer.is_valid():
@@ -187,12 +313,29 @@ class RecipeDetailView(APIView):
         except Recipe.DoesNotExist:
             return None
 
+    @extend_schema(
+        tags=["Рецепти"],
+        summary="Рецепт з кроками й інгредієнтами",
+        responses={200: RecipeDetailSerializer, 404: NOT_FOUND},
+    )
     def get(self, request, pk):
         recipe = self.get_recipe(pk)
         if recipe is None:
             return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
         return Response(RecipeDetailSerializer(recipe).data)
 
+    @extend_schema(
+        tags=["Рецепти"],
+        summary="Змінити рецепт повністю",
+        request=RecipeInputSerializer,
+        examples=[RECIPE_EXAMPLE],
+        responses={
+            200: RecipeDetailSerializer,
+            400: BAD_REQUEST,
+            401: UNAUTHORIZED,
+            404: NOT_FOUND,
+        },
+    )
     def put(self, request, pk):
         recipe = self.get_recipe(pk)
         if recipe is None:
@@ -203,6 +346,11 @@ class RecipeDetailView(APIView):
         recipe = serializer.save()
         return Response(RecipeDetailSerializer(recipe).data)
 
+    @extend_schema(
+        tags=["Рецепти"],
+        summary="Видалити рецепт",
+        responses={204: DELETED, 401: UNAUTHORIZED, 404: NOT_FOUND},
+    )
     def delete(self, request, pk):
         recipe = self.get_recipe(pk)
         if recipe is None:
