@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.exceptions import (
     AuthenticationFailed,
     NotAuthenticated,
@@ -6,16 +8,32 @@ from rest_framework.exceptions import (
 )
 from rest_framework.views import exception_handler
 
+logger = logging.getLogger(__name__)
+
 AUTH_MESSAGES = {
     "no_active_account": "Невірне ім'я користувача або пароль.",
     "token_not_valid": "Токен недійсний або строк його дії минув. Увійдіть знову.",
 }
 
 
+def log_exception(exc, context):
+    request = context.get("request")
+    if request is None:
+        return
+    where = f"{request.method} {request.path}"
+    if isinstance(exc, NotAuthenticated):
+        logger.warning("Запит без авторизації: %s", where)
+    elif isinstance(exc, AuthenticationFailed):
+        logger.warning("Невдала автентифікація: %s", where)
+    elif isinstance(exc, PermissionDenied):
+        logger.warning("Відмовлено в доступі: %s, user_id=%s", where, request.user.id)
+
+
 def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
     if response is None:
         return response
+    log_exception(exc, context)
     if isinstance(exc, ValidationError):
         response.data = {"detail": "Некоректні дані.", "errors": response.data}
     elif isinstance(exc, NotAuthenticated):

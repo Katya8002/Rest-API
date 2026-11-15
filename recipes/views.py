@@ -1,3 +1,5 @@
+import logging
+
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -16,6 +18,7 @@ from .serializers import (
     RecipeShortSerializer,
 )
 
+logger = logging.getLogger(__name__)
 BAD_REQUEST = OpenApiResponse(description="Некоректні дані")
 UNAUTHORIZED = OpenApiResponse(description="Немає токена або він недійсний")
 FORBIDDEN = OpenApiResponse(description="Дія доступна лише адміністратору")
@@ -45,6 +48,7 @@ def error_response(message, http_status, errors=None):
 
 
 def invalid_data(serializer):
+    logger.warning("Некоректні дані, помилки в полях: %s", list(serializer.errors))
     return error_response(
         "Некоректні дані.", status.HTTP_400_BAD_REQUEST, serializer.errors
     )
@@ -82,7 +86,10 @@ class CategoryListView(APIView):
         serializer = CategorySerializer(data=request.data)
         if not serializer.is_valid():
             return invalid_data(serializer)
-        serializer.save()
+        category = serializer.save()
+        logger.info(
+            "Створено категорію id=%s, user_id=%s", category.id, request.user.id
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -126,6 +133,7 @@ class CategoryDetailView(APIView):
         if not serializer.is_valid():
             return invalid_data(serializer)
         serializer.save()
+        logger.info("Змінено категорію id=%s, user_id=%s", category.id, request.user.id)
         return Response(serializer.data)
 
     @extend_schema(
@@ -145,6 +153,11 @@ class CategoryDetailView(APIView):
             return error_response("Категорію не знайдено.", status.HTTP_404_NOT_FOUND)
         recipes_count = category.recipes.count()
         if recipes_count > 0:
+            logger.warning(
+                "Видалення категорії id=%s заблоковано: рецептів %s",
+                category.id,
+                recipes_count,
+            )
             return error_response(
                 f"Неможливо видалити категорію «{category.name}», оскільки "
                 f"в ній є рецепти: {recipes_count}. Спершу видаліть їх "
@@ -152,6 +165,7 @@ class CategoryDetailView(APIView):
                 status.HTTP_409_CONFLICT,
             )
         category.delete()
+        logger.info("Видалено категорію id=%s, user_id=%s", pk, request.user.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -185,7 +199,8 @@ class ProductListView(APIView):
         serializer = ProductSerializer(data=request.data)
         if not serializer.is_valid():
             return invalid_data(serializer)
-        serializer.save()
+        product = serializer.save()
+        logger.info("Створено продукт id=%s, user_id=%s", product.id, request.user.id)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -229,6 +244,7 @@ class ProductDetailView(APIView):
         if not serializer.is_valid():
             return invalid_data(serializer)
         serializer.save()
+        logger.info("Змінено продукт id=%s, user_id=%s", product.id, request.user.id)
         return Response(serializer.data)
 
     @extend_schema(
@@ -248,12 +264,18 @@ class ProductDetailView(APIView):
             return error_response("Продукт не знайдено.", status.HTTP_404_NOT_FOUND)
         recipes_count = product.recipe_ingredients.count()
         if recipes_count > 0:
+            logger.warning(
+                "Видалення продукту id=%s заблоковано: рецептів %s",
+                product.id,
+                recipes_count,
+            )
             return error_response(
                 f"Неможливо видалити продукт «{product.name}», оскільки він "
                 f"використовується в рецептах: {recipes_count}.",
                 status.HTTP_409_CONFLICT,
             )
         product.delete()
+        logger.info("Видалено продукт id=%s, user_id=%s", pk, request.user.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -271,6 +293,7 @@ class RecipeListView(APIView):
         if not filters.is_valid():
             return invalid_data(filters)
         params = filters.validated_data
+        logger.debug("Список рецептів, фільтри: %s", dict(params))
 
         recipes = Recipe.objects.select_related("category").order_by("id")
         if "category_id" in params:
@@ -299,6 +322,7 @@ class RecipeListView(APIView):
         if not serializer.is_valid():
             return invalid_data(serializer)
         recipe = serializer.save()
+        logger.info("Створено рецепт id=%s, user_id=%s", recipe.id, request.user.id)
         return Response(
             RecipeDetailSerializer(recipe).data, status=status.HTTP_201_CREATED
         )
@@ -344,6 +368,7 @@ class RecipeDetailView(APIView):
         if not serializer.is_valid():
             return invalid_data(serializer)
         recipe = serializer.save()
+        logger.info("Змінено рецепт id=%s, user_id=%s", recipe.id, request.user.id)
         return Response(RecipeDetailSerializer(recipe).data)
 
     @extend_schema(
@@ -356,4 +381,5 @@ class RecipeDetailView(APIView):
         if recipe is None:
             return error_response("Рецепт не знайдено.", status.HTTP_404_NOT_FOUND)
         recipe.delete()
+        logger.info("Видалено рецепт id=%s, user_id=%s", pk, request.user.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
