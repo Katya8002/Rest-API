@@ -1,4 +1,5 @@
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -28,6 +29,7 @@ class CategoryDetailSerializer(serializers.ModelSerializer):
         model = Category
         fields = ["id", "name", "recipes"]
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_recipes(self, category):
         recipes = category.recipes.order_by("id")
         return [
